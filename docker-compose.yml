@@ -1,0 +1,9 @@
+services:
+  qingsijiankong:
+    image: ghcr.io/pwj2333/qingsijiankong:latest
+    container_name: qingsijiankong
+    restart: unless-stopped
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./data:/app/data
+      - ./logs:/app/logs

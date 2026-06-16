@@ -1,0 +1,17 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.log
+*.xlsx
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+venv
+env
+logs
+data
+.docx_extracted
+config.json

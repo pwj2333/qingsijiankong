@@ -1,0 +1,21 @@
+{
+  "account": "your_account",
+  "password": "your_password",
+  "poll_interval_seconds": 30,
+  "request_timeout_seconds": 20,
+  "lookback_hours": 24,
+  "page_size": 50,
+  "order_by": 0,
+  "log_dir": "logs",
+  "excel_log_path": "logs/alarm_handle_log.xlsx",
+  "processed_store_path": "data/processed_ids.json",
+  "debug": false,
+  "auto_handle": {
+    "query_status": "2",
+    "is_valid": 0,
+    "handle_method": "识别错误",
+    "handle_result": "",
+    "is_archive": 0,
+    "remark": ""
+  }
+}

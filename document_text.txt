@@ -1,0 +1,354 @@
+智能船舶综合运营服务平台接口文档
+一、接口服务
+获取授权accessToken
+接口功能：获取accessToken
+接口说明：登录获取accessToken
+接口请求地址：https://haiwang.kinthtech.com.cn/msaPlatform/platform/user/login
+请求方式：POST
+参数类型：x-www-from-urlencoded
+请求参数说明：
+字段名
+字段说明
+字段类型
+是否必填
+备注
+account
+账号
+String
+y
+password
+密码
+String
+y
+调用的时候要做md5加密后给后端
+响应字段说明：
+字段名
+类型
+说明
+accessToken
+string
+接口调用凭证（后续调用接口需要）
+expiresIn
+string
+过期时间（默认2小时）
+响应示例
+成功响应编码：
+{
+"msg": "账号密码登录成功",
+"item": {
+"accessToken": "c0074a2d-8ae2-40c4-95ff-7c32a0d3b28f",
+"expiresIn": 7200
+},
+"code": 100001,
+"success": true,
+"message": "账号密码登录成功"
+}
+失败响应编码：
+{
+"msg": "busy system",
+"code": 100002,
+"entity": "获取token失败！"
+}
+获取船舶录像机和摄像头状态
+接口功能：查询船舶录像机和摄像头状态列表接口说明：查询录像机以及摄像头列表，返回对应设备在线状态。接口请求地址：https://haiwang.kinthtech.com.cn/ferryEye/hw_other/getShipCameraWithStatus
+请求头
+请求内容
+说明
+Authorization
+accessToken
+获取授权accessToken接口中拿到的 accessToken
+请求方式：POST参数类型：x-www-form-urlencoded
+请求参数：
+字段名
+字段说明
+字段类型
+备注
+pageSize
+每页条数
+Integer
+非必填，默认为8
+pageNo
+页码
+Integer
+非必填，默认为1
+key
+船名关键字
+String
+非必填
+isPreciseMatch
+是否精确匹配
+Boolean
+true时按船名精确匹配，false 时模糊匹配
+响应字段说明：
+字段名
+类型
+说明
+pageSize
+Integer
+每页条数
+currentPage
+Integer
+当前页码
+totalPage
+Integer
+总页数
+totalCount
+Integer
+总记录数
+list
+Array
+船舶列表
+list.mmsi
+string
+船舶 MMSI
+list.deviceNo
+string
+设备号
+list.shipName
+string
+船名
+list.nvrStatus
+int
+NVR 在线状态（1 在线，0 离线）
+list.channelList
+Array
+通道列表，
+list.channelList.deviceNo
+string
+通道号
+list.channelList.deviceName
+string
+通道名称
+list.channelList.status
+int
+通道状态（1 在线，0 离线）
+响应示例（成功）：
+{
+"msg": "success",
+"item": {
+"pageSize": 50,
+"currentPage": 1,
+"totalPage": 1,
+"totalCount": 1,
+"list": [
+{
+"mmsi": "412410110",
+"deviceNo": "hw_dh28888",
+"shipName": "瑞高立信",
+"nvrStatus": 1,
+"channelList": [
+{
+"deviceNo": "hw_dh28888_0",
+"deviceName": "驾驶台",
+"status": 1
+}
+]
+}
+]
+},
+"code": 100001,
+"success": true
+}
+查询异常报警
+接口功能：查询船舶异常行为报警记录
+接口请求地址：https://haiwang.kinthtech.com.cn/ferryEye/captain/findExpAlarm
+请求头
+请求内容
+说明
+Authorization
+accessToken
+获取授权accessToken接口中拿到的accessToken
+请求方式： POST
+参数类型：x-www-form-urlencoded
+请求参数：
+字段名
+字段说明
+字段类型
+备注
+status
+报警状态
+String
+可选，不填-全部；0-正常处理；1-超时处理；2-未处理
+startTime
+报警开始时间
+String
+可选，格式：yyyy-MM-dd HH:mm:ss（默认可传入最近一天）
+endTime
+报警结束时间
+String
+可选，格式：yyyy-MM-dd HH:mm:ss（默认可传入最近一天）
+pageNum
+页码
+Integer
+当前页码
+从1开始
+pageSize
+分页大小
+Integer
+每页显示记录数
+orderBy
+排序方式
+Integer
+默认传0
+响应字段说明：
+字段名
+类型
+说明
+pageNum
+integer
+当前页码
+pageSize
+integer
+分页大小
+totalRecord
+integer
+总记录数
+totalPage
+integer
+总页数
+list
+array
+报警记录列表
+list[].id
+string
+报警记录ID
+list[].shipName
+string
+船舶名称
+list[].mmsi
+string
+船舶MMSI码
+list[].behavior
+string
+异常行为类型
+list[].riskLevel
+string
+风险等级：低、中、高、严重等
+list[].alarmLevel
+string
+报警等级
+list[].monitorAngle
+string
+监控角度/摄像头位置
+list[].alarmTime
+string
+报警时间，格式：yyyy-MM-dd HH:mm:ss
+list[].alarmContent
+string
+报警内容/详情描述
+list[].status
+string
+报警状态：待处理、已处理、已归档等
+list[].isValid
+integer
+是否有效：0无效
+1有效
+list[].handleMethod
+string
+处理方式
+list[].handler
+string
+处理人
+list[].handleTime
+string
+处理时间，格式：yyyy-MM-dd HH:mm:ss
+list[].readStatus
+integer
+阅读状态：0未读
+1已读
+响应示例：成功响应：
+json
+{
+"msg": "success",
+"item": {
+"pageSize": 1,
+"currentPage": 1,
+"totalPage": 1,
+"totalCount": 1,
+"list": [
+{
+"alarmContent": "瑞高热情触发了未定期巡查机舱，请立即关注并处理",
+"imgMd": "F14C19200798FB042008CB03B896E932",
+"riskLevelByCount": 1,
+"handleTime": "2026-05-14 08:15:44",
+"locationName": "机舱主机",
+"riskLevel": 2,
+"handleResult": null,
+"handlePersonName": "潘伟建",
+"isValid": 0,
+"remark": null,
+"shipName": "瑞高热情",
+"speed": 5.1,
+"videoMd": null,
+"handleLevel": 1,
+"path": "",
+"createdAt": "2026-05-14 06:56:37",
+"handleMethod": "识别错误",
+"videoUrl": null,
+"id": "2054697352246661120",
+"behavior": "未定期巡查机舱",
+"shipStatus": "在航",
+"RN": 1,
+"happenTime": "2026-05-14 06:56:05",
+"status": 1
+},
+]
+},
+"code": 100001,
+"success": true
+}
+处理异常告警
+接口功能：处理异常告警
+接口请求地址：
+https://haiwang.kinthtech.com.cn/ferryEye/captain/expAlarmHanding
+请求头：
+请求头
+请求内容
+说明
+Authorization
+accessToken
+获取授权accessToken接口中拿到的accessToken
+请求方式： POST
+参数类型： x-www-form-urlencoded
+请求参数：
+字段名
+字段说明
+字段类型
+备注
+id
+告警ID
+String
+报警记录ID,多个id使用逗号分隔
+isValid
+是否有效
+Integer
+0：无效报警，1：有效报警
+handleMethod
+处理类型
+String
+可选值：识别错误，未正确匹配，系统测试等
+handleResult
+处理结果
+String
+处理的结果描述
+isArchive
+是否归档
+Integer
+默认传0
+remark
+备注
+String
+处理备注说明
+响应字段说明
+字段名
+类型
+说明
+msg
+String
+响应消息，成功时为"success"
+code
+Integer
+响应码，成功为100001
+success
+Boolean
+是否成功，true或false
