@@ -16,10 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY run.py ./
 COPY src ./src
 
-RUN useradd --create-home --shell /bin/bash appuser \
-    && mkdir -p /app/data /app/logs \
-    && chown -R appuser:appuser /app
-
-USER appuser
+RUN mkdir -p /app/data /app/logs
 
 CMD ["python", "run.py", "--config", "config.json"]
