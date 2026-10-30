@@ -94,7 +94,7 @@ class ConfigAndRuntimeTests(unittest.TestCase):
 
     def test_paths_are_relative_to_config_and_credentials_are_separate(self):
         config = load_config(self.config_path)
-        self.assertEqual(config.state_db_path, self.root / "data/alarm_state.sqlite3")
+        self.assertEqual(config.state_db_path, self.root.resolve() / "data/alarm_state.sqlite3")
         credentials = load_credentials(self.credentials_path)
         self.assertEqual(credentials.email.recipients, ("one@unit.test", "two@unit.test"))
         self.assertNotIn("secret-password", repr(credentials))
