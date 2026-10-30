@@ -1,9 +1,23 @@
 services:
   qingsijiankong:
-    image: ghcr.io/pwj2333/qingsijiankong:latest
+    build: .
+    image: ${QINGSI_IMAGE:-qingsijiankong:local}
     container_name: qingsijiankong
     restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
     volumes:
-      - ./config.json:/app/config.json:ro
+      - type: bind
+        source: ./config.json
+        target: /app/config.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./credentials.json
+        target: /app/credentials.json
+        read_only: true
+        bind:
+          create_host_path: false
       - ./data:/app/data
       - ./logs:/app/logs

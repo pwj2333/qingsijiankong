@@ -13,3 +13,8 @@ logs/
 data/
 .docx_extracted/
 config.json
+credentials.json
+credentials.*.json
+!credentials.example.json
+*.sqlite3
+*.sqlite3-*

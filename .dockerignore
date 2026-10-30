@@ -15,3 +15,7 @@ logs
 data
 .docx_extracted
 config.json
+credentials.json
+credentials.*.json
+*.sqlite3
+*.sqlite3-*

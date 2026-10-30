@@ -1,21 +1,25 @@
 {
-  "account": "your_account",
-  "password": "your_password",
   "poll_interval_seconds": 30,
   "request_timeout_seconds": 20,
+  "email_timeout_seconds": 20,
   "lookback_hours": 24,
   "page_size": 50,
   "order_by": 0,
   "log_dir": "logs",
   "excel_log_path": "logs/alarm_handle_log.xlsx",
+  "state_db_path": "data/alarm_state.sqlite3",
   "processed_store_path": "data/processed_ids.json",
   "debug": false,
+  "sampling": {
+    "keywords": ["人员离岗", "未定期巡检", "未定期巡查"],
+    "probability": 0.5
+  },
+  "email_retry_minutes": [1, 5, 15, 30],
   "auto_handle": {
-    "query_status": "2",
-    "is_valid": 0,
-    "handle_method": "识别错误",
-    "handle_result": "",
+    "valid_handle_method": "通知已处理",
+    "invalid_handle_method": "识别错误",
+    "handle_result": "系统按配置自动处理，请负责人核实现场情况",
     "is_archive": 0,
-    "remark": ""
+    "remark": "系统按配置自动处理"
   }
 }

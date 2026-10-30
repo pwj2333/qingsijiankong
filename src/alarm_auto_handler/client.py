@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from typing import Any
 
 import requests
 
 
 class ApiError(RuntimeError):
-    """Raised when the remote API returns an error."""
+    """A sanitized API failure; unknown outcomes must be reconciled before retry."""
+
+    def __init__(self, message: str, *, outcome_unknown: bool = False) -> None:
+        super().__init__(message)
+        self.outcome_unknown = outcome_unknown
 
 
 @dataclass(slots=True)
 class TokenInfo:
     access_token: str
-    expires_at: datetime
+    expires_at: float
 
 
 class QinSiApiClient:
@@ -30,110 +34,73 @@ class QinSiApiClient:
         self.session = requests.Session()
         self.token_info: TokenInfo | None = None
 
-    def _md5_password(self) -> str:
-        return hashlib.md5(self.password.encode("utf-8")).hexdigest()
-
-    def _request(
-        self,
-        method: str,
-        url: str,
-        *,
-        data: dict[str, Any] | None = None,
-        auth_required: bool = True,
-    ) -> dict[str, Any]:
-        headers: dict[str, str] = {}
-        if auth_required:
-            self.ensure_token()
-            headers["Authorization"] = self.token_info.access_token  # type: ignore[union-attr]
-
-        response = self.session.request(
-            method=method,
-            url=url,
-            data=data,
-            headers=headers,
-            timeout=self.timeout_seconds,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if not payload.get("success"):
-            raise ApiError(
-                f"接口调用失败: code={payload.get('code')}, msg={payload.get('msg') or payload.get('message')}"
-            )
-        return payload
+    def _request(self, method: str, url: str, *, data: dict[str, Any] | None = None,
+                 auth_required: bool = True) -> dict[str, Any]:
+        for attempt in range(2):
+            headers = {}
+            if auth_required:
+                self.ensure_token()
+                headers["Authorization"] = self.token_info.access_token
+            try:
+                response = self.session.request(method, url, data=data, headers=headers,
+                                                timeout=self.timeout_seconds)
+            except requests.RequestException:
+                raise ApiError("接口网络异常，结果待核实", outcome_unknown=True) from None
+            if response.status_code == 401 and auth_required:
+                self.token_info = None
+                if attempt == 0:
+                    continue
+            if response.status_code >= 400:
+                raise ApiError(f"接口 HTTP {response.status_code}",
+                               outcome_unknown=response.status_code >= 500 or response.status_code == 408)
+            try:
+                payload = response.json()
+            except ValueError:
+                raise ApiError("接口未返回有效 JSON", outcome_unknown=True) from None
+            if not isinstance(payload, dict):
+                raise ApiError("接口返回结构异常", outcome_unknown=True)
+            if payload.get("success") is not True:
+                # Remote error bodies can echo credentials or tokens; never log them.
+                message = str(payload.get("msg") or payload.get("message") or "").lower()
+                auth_failed = str(payload.get("code")) == "401" or "token" in message
+                if auth_required and auth_failed:
+                    self.token_info = None
+                    if attempt == 0:
+                        continue
+                raise ApiError("接口拒绝请求，请检查平台权限、参数或账号状态")
+            return payload
+        raise ApiError("接口鉴权失败")
 
     def login(self) -> TokenInfo:
-        payload = self._request(
-            "POST",
-            self.LOGIN_URL,
-            data={"account": self.account, "password": self._md5_password()},
-            auth_required=False,
-        )
+        payload = self._request("POST", self.LOGIN_URL, data={
+            "account": self.account,
+            "password": hashlib.md5(self.password.encode("utf-8")).hexdigest(),
+        }, auth_required=False)
         item = payload.get("item") or {}
-        access_token = str(item.get("accessToken", "")).strip()
-        if not access_token:
-            raise ApiError("登录成功但未返回 accessToken")
-
-        expires_in = int(item.get("expiresIn", 7200))
-        expires_at = datetime.now() + timedelta(seconds=max(60, expires_in - 300))
-        self.token_info = TokenInfo(access_token=access_token, expires_at=expires_at)
+        token = item.get("accessToken") if isinstance(item, dict) else None
+        if not isinstance(token, str) or not token.strip():
+            raise ApiError("登录未返回 accessToken")
+        try:
+            lifetime = int(item.get("expiresIn", 7200))
+        except (TypeError, ValueError):
+            raise ApiError("登录返回的有效期格式错误") from None
+        self.token_info = TokenInfo(token.strip(), time.monotonic() + max(1, lifetime - min(300, lifetime // 2)))
         return self.token_info
 
     def ensure_token(self) -> None:
-        if self.token_info is None or datetime.now() >= self.token_info.expires_at:
+        if self.token_info is None or time.monotonic() >= self.token_info.expires_at:
             self.login()
 
-    def find_alarms(
-        self,
-        *,
-        status: str,
-        start_time: str,
-        end_time: str,
-        page_num: int,
-        page_size: int,
-        order_by: int,
-    ) -> dict[str, Any]:
-        try:
-            return self._request(
-                "POST",
-                self.FIND_ALARM_URL,
-                data={
-                    "status": status,
-                    "startTime": start_time,
-                    "endTime": end_time,
-                    "pageNum": page_num,
-                    "pageSize": page_size,
-                    "orderBy": order_by,
-                },
-            )
-        except ApiError as exc:
-            if "token" in str(exc).lower() or "401" in str(exc):
-                self.token_info = None
-            raise
+    def find_alarms(self, *, status: str, start_time: str, end_time: str, page_num: int,
+                    page_size: int, order_by: int) -> dict[str, Any]:
+        return self._request("POST", self.FIND_ALARM_URL, data={
+            "status": status, "startTime": start_time, "endTime": end_time,
+            "pageNum": page_num, "pageSize": page_size, "orderBy": order_by,
+        })
 
-    def handle_alarm(
-        self,
-        *,
-        alarm_id: str,
-        is_valid: int,
-        handle_method: str,
-        handle_result: str,
-        is_archive: int,
-        remark: str,
-    ) -> dict[str, Any]:
-        try:
-            return self._request(
-                "POST",
-                self.HANDLE_ALARM_URL,
-                data={
-                    "id": alarm_id,
-                    "isValid": is_valid,
-                    "handleMethod": handle_method,
-                    "handleResult": handle_result,
-                    "isArchive": is_archive,
-                    "remark": remark,
-                },
-            )
-        except ApiError as exc:
-            if "token" in str(exc).lower() or "401" in str(exc):
-                self.token_info = None
-            raise
+    def handle_alarm(self, *, alarm_id: str, is_valid: int, handle_method: str,
+                     handle_result: str, is_archive: int, remark: str) -> dict[str, Any]:
+        return self._request("POST", self.HANDLE_ALARM_URL, data={
+            "id": alarm_id, "isValid": is_valid, "handleMethod": handle_method,
+            "handleResult": handle_result, "isArchive": is_archive, "remark": remark,
+        })

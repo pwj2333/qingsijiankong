@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import shutil
-from datetime import datetime
+import threading
 from pathlib import Path
 from zipfile import BadZipFile
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+
+from .time_utils import now
 
 
 class ExcelAlarmLogger:
@@ -31,17 +33,18 @@ class ExcelAlarmLogger:
         self.file_path = file_path
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self._logger = logging.getLogger(__name__)
+        self._lock = threading.Lock()
         self._ensure_workbook()
 
     def _ensure_workbook(self) -> None:
         # If the workbook is damaged or not really an xlsx file, back it up and recreate it.
         if self.file_path.exists():
             try:
-                load_workbook(self.file_path)
+                load_workbook(self.file_path).close()
                 return
             except self._RECOVERABLE_EXCEPTIONS:
                 bak_path = self.file_path.with_suffix(
-                    self.file_path.suffix + ".broken." + datetime.now().strftime("%Y%m%d%H%M%S")
+                    self.file_path.suffix + ".broken." + now().strftime("%Y%m%d%H%M%S%f")
                 )
                 try:
                     shutil.move(str(self.file_path), str(bak_path))
@@ -61,6 +64,7 @@ class ExcelAlarmLogger:
         for index, width in enumerate((20, 14, 14, 24, 18, 26, 12, 20, 16, 12, 50), start=1):
             sheet.column_dimensions[chr(64 + index)].width = width
         workbook.save(self.file_path)
+        workbook.close()
 
     def _load_workbook(self):
         try:
@@ -83,24 +87,26 @@ class ExcelAlarmLogger:
         handle_method: str = "",
         is_valid: str = "",
     ) -> None:
+        with self._lock:
+            self._append_row(event_type=event_type, result=result, message=message, alarm_id=alarm_id,
+                             ship_name=ship_name, behavior=behavior, risk_level=risk_level,
+                             alarm_time=alarm_time, handle_method=handle_method, is_valid=is_valid)
+
+    def _append_row(self, **values) -> None:
+        workbook = None
         try:
             workbook = self._load_workbook()
             sheet = workbook.active
             sheet.append(
                 [
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    event_type,
-                    result,
-                    alarm_id,
-                    ship_name,
-                    behavior,
-                    risk_level,
-                    alarm_time,
-                    handle_method,
-                    is_valid,
-                    message,
+                    now().strftime("%Y-%m-%d %H:%M:%S"),
+                    *[values[key] for key in ("event_type", "result", "alarm_id", "ship_name", "behavior",
+                                             "risk_level", "alarm_time", "handle_method", "is_valid", "message")],
                 ]
             )
             workbook.save(self.file_path)
         except Exception:
-            self._logger.exception("写入 Excel 日志失败: %s", self.file_path)
+            self._logger.error("写入 Excel 日志失败，请检查日志文件和目录权限")
+        finally:
+            if workbook is not None:
+                workbook.close()
